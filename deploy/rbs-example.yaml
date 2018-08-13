@@ -1,0 +1,16 @@
+apiVersion: "doit-intl.com/v1"
+kind: Rbs
+metadata:
+    name: my-rbs-example
+spec:
+  watchperiod: 60
+  metricssource: stackdriver
+  namespaces:
+    - name: default
+      deployments:
+        - hello-kubernetes
+    - name: kube-system
+      deployments:
+        - kube-dns
+        - metadata-agent-cluster-level
+

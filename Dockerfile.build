@@ -1,0 +1,16 @@
+FROM golang:alpine
+MAINTAINER "Aviv Laufer <aviv.laufer@gmail.com>"
+ARG BUILD_DATE
+ARG VERSION
+RUN apk update && \
+    apk add git build-base && \
+    rm -rf /var/cache/apk/* && \
+    mkdir -p "$GOPATH/src/github.com/doitintl/kuberbs"
+
+ADD . "$GOPATH/src/github.com/doitintl/kuberbs"
+
+RUN cd "$GOPATH/src/github.com/doitintl/kuberbs" && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$VERSION -X main.buildDate=$BUILD_DATE" -o /kuberbs
+
+COPY Dockerfile.run /
+CMD tar -cf - -C / Dockerfile.run kuberbs
