@@ -38,27 +38,29 @@ var WatchList = list.New()
 
 // Deployment holds deployment info & status
 type Deployment struct {
-	Name      string
-	NameSpace string
-	Threshold int
-	metrics   metrics.Metrics
-	Watching  bool
-	client    kubernetes.Interface
-	current   *apps_v1.Deployment
-	new       *apps_v1.Deployment
+	Name       string
+	NameSpace  string
+	Threshold  int
+	metrics    metrics.Metrics
+	Watching   bool
+	IsRollback bool
+	client     kubernetes.Interface
+	current    *apps_v1.Deployment
+	new        *apps_v1.Deployment
 }
 
 // NewDeploymentController - crteate a New DeploymentController
 func NewDeploymentController(kubeClient kubernetes.Interface, current *apps_v1.Deployment, new *apps_v1.Deployment, threshold int) *Deployment {
 
 	d := &Deployment{
-		Name:      current.Name,
-		NameSpace: current.Namespace,
-		Threshold: threshold,
-		current:   current,
-		new:       new,
-		client:    kubeClient,
-		Watching:  false,
+		Name:       current.Name,
+		NameSpace:  current.Namespace,
+		Threshold:  threshold,
+		current:    current,
+		new:        new,
+		client:     kubeClient,
+		Watching:   false,
+		IsRollback: false,
 	}
 	return d
 }
@@ -133,8 +135,8 @@ func (d *Deployment) WatchDoneHandler(remove bool) {
 func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Container) bool {
 	for _, item := range a {
 		if item.Name == b.Name {
-			if utils.IsSameImage(item, b) {
-				return false
+			if !utils.IsSameImage(item, b) {
+				return true
 			}
 		}
 	}
@@ -143,7 +145,7 @@ func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Contain
 
 // DoRollback TODO make it private
 func (d *Deployment) DoRollback() {
-
+	d.IsRollback = true
 	for _, v := range d.new.Spec.Template.Spec.Containers {
 		if meta_v1.HasAnnotation(d.new.ObjectMeta, "kuberbs.pod."+v.Name) {
 			logrus.Debug(d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])

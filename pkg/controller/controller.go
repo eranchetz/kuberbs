@@ -122,7 +122,7 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 					logrus.Debug(b, a)
 				}
 			}*/
-			if utils.IsStrategySupported(string((*apps_v1.Deployment).Spec.Strategy.Type)) {
+			if utils.IsStrategySupported(string(new.(*apps_v1.Deployment).Spec.Strategy.Type)) {
 				var err error
 				newEvent.key, err = cache.MetaNamespaceKeyFunc(old)
 				newEvent.eventType = "update"
@@ -286,20 +286,24 @@ func (c *Controller) processItem(newEvent Event) error {
 		if newEvent.new.Status.ObservedGeneration != newEvent.old.Status.ObservedGeneration {
 			return nil
 		}
-		var m metrics.Metrics
-		et := time.Now().Add(time.Duration(watchPeriod) * time.Minute)
-		switch metricsSource {
-		case "stackdriver":
-			m = st.NewStackDriver(time.Now(), et, metricName)
-			m.SetMetricsHandler(dp.MetricsHandler)
-			m.SetDoneHandler(dp.WatchDoneHandler)
-		default:
-			return nil
+		if !dp.IsRollback {
+			var m metrics.Metrics
+			et := time.Now().Add(time.Duration(watchPeriod) * time.Minute)
+			switch metricsSource {
+			case "stackdriver":
+				m = st.NewStackDriver(time.Now(), et, metricName)
+				m.SetMetricsHandler(dp.MetricsHandler)
+				m.SetDoneHandler(dp.WatchDoneHandler)
+			default:
+				return nil
+			}
+			if dp.Watching {
+				dp.StopWatch(false)
+			}
+			go dp.StartWatch(m)
+			//TODO remove once testing is done
+			dp.DoRollback()
 		}
-		if dp.Watching {
-			dp.StopWatch(false)
-		}
-		go dp.StartWatch(m)
 		return nil
 
 	case "create":
