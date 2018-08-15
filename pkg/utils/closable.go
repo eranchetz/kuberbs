@@ -18,35 +18,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package v1
+package utils
 
-import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import "log"
 
-type Rbs struct {
-	meta_v1.TypeMeta   `json:",inline"`
-	meta_v1.ObjectMeta `json:"metadata,omitempty"`
-	Spec               RbsSpec `json:"spec"`
+// Closable wraps Close() method
+type Closable interface {
+	Close() error
 }
 
-type RbsSpec struct {
-	WatchPeriod   int    `json:"watchperiod"`
-	MetricsSource string `json:"metricssource"`
-	Namespaces    []struct {
-		Name        string `json:"name"`
-		Deployments []struct {
-			Deployment struct {
-				Name      string `json:"name"`
-				Metric    string `json:"metric"`
-				Threshold int    `json:"threshold"`
-			} `json:"deployment"`
-		} `json:"deployments"`
-	} `json:"namespaces"`
-}
-
-type RbsList struct {
-	meta_v1.TypeMeta `json:",inline"`
-	meta_v1.ListMeta `json:"metadata,omitempty"`
-	Items            []Rbs `json:"items"`
+func closeIt(obj Closable) {
+	err := obj.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

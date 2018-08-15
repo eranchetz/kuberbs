@@ -21,12 +21,12 @@
 package utils
 
 import (
-	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
 )
 
+// ProjectName -  running in GCP get the project name
 func ProjectName() (string, error) {
 	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
 	if err != nil {
@@ -38,7 +38,7 @@ func ProjectName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer closeIt(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return "", errors.New("discover-gce: invalid status code when fetching project id")
@@ -51,15 +51,7 @@ func ProjectName() (string, error) {
 	return string(project), nil
 }
 
+// ProjectResource - builds ProjectResource for st
 func ProjectResource(projectID string) string {
 	return "projects/" + projectID
-}
-
-// formatResource marshals a response object as JSON.
-func FormatResource(resource interface{}) []byte {
-	b, err := json.MarshalIndent(resource, "", "    ")
-	if err != nil {
-		panic(err)
-	}
-	return b
 }

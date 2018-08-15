@@ -3,14 +3,21 @@ kind: Rbs
 metadata:
     name: my-rbs-example
 spec:
-  watchperiod: 60
+  watchperiod: 1
   metricssource: stackdriver
   namespaces:
-    - name: default
-      deployments:
-        - hello-kubernetes
-    - name: kube-system
-      deployments:
-        - kube-dns
-        - metadata-agent-cluster-level
+  - name: default
+    deployments:
+    - deployment:
+        name: hello-kubernetes
+        metric: logging.googleapis.com/user/hello-kubernetes
+        threshold: 5
+    - deployment:
+        name: foo
+        metric: logging.googleapis.com/user/bar
+  - name: kube-system
+    deployments:
+    - deployment:
+        name: kube-dns
+        metric: logging.googleapis.com/user/dig
 

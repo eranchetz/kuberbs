@@ -21,6 +21,9 @@
 package deployment
 
 import (
+	"container/list"
+	"fmt"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/doitintl/kuberbs/pkg/metrics"
 	"github.com/doitintl/kuberbs/pkg/utils"
@@ -30,31 +33,38 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type Container struct {
-	Name  string
-	Image string
-}
+// WatchList contain all active deployments
+var WatchList = list.New()
 
+// Deployment holds deployment info & status
 type Deployment struct {
 	Name      string
 	NameSpace string
+	Threshold int
+	metrics   metrics.Metrics
+	Watching  bool
 	client    kubernetes.Interface
 	current   *apps_v1.Deployment
 	new       *apps_v1.Deployment
 }
 
-func NewDeploymentController(kubeClient kubernetes.Interface, current *apps_v1.Deployment, new *apps_v1.Deployment) *Deployment {
+// NewDeploymentController - crteate a New DeploymentController
+func NewDeploymentController(kubeClient kubernetes.Interface, current *apps_v1.Deployment, new *apps_v1.Deployment, threshold int) *Deployment {
 
-	return &Deployment{
+	d := &Deployment{
 		Name:      current.Name,
 		NameSpace: current.Namespace,
+		Threshold: threshold,
 		current:   current,
 		new:       new,
 		client:    kubeClient,
+		Watching:  false,
 	}
+	return d
 }
 
-func (d *Deployment) SaveCurrentDeploymentState() {
+// SaveCurrentDeploymentState - store image version of current deployment as an annotation
+func (d *Deployment) SaveCurrentDeploymentState() error {
 	if d.new != nil {
 		for _, v := range d.current.Spec.Template.Spec.Containers {
 			meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.pod."+v.Name, v.Image)
@@ -62,27 +72,40 @@ func (d *Deployment) SaveCurrentDeploymentState() {
 		_, err := d.client.AppsV1().Deployments(d.new.Namespace).Update(d.new)
 		if err != nil {
 			logrus.Error(err)
+			return err
 		}
 	} else {
 		logrus.Debug("No new deployment object found")
+		return fmt.Errorf("No new deployment object found, %v ", d.current.Name)
 	}
+	return nil
 }
 
+// StartWatch - start the metrcis watcher
 func (d *Deployment) StartWatch(m metrics.Metrics) {
 	logrus.Debugf("Calling m.Run for %s @ %s", d.Name, d.NameSpace)
-	m.Run()
+	d.Watching = true
+	d.metrics = m
+	go m.Start()
 }
 
+// DeploymentComplete - return true if deployment id sone
+func (d *Deployment) DeploymentComplete(newd *apps_v1.Deployment) bool {
+	return utils.DeploymentComplete(d.new, &newd.Status)
+}
 
+// StopWatch - stop the metrics watcher
+func (d *Deployment) StopWatch(remove bool) {
+	d.metrics.Stop(false)
+}
+
+// ShouldWatch do we have containers to watch
 func (d *Deployment) ShouldWatch() bool {
-	commonContainers := d.ContainersIntersection()
-	if len (commonContainers) == 0 {
-		return false
-	}
-	return true
+	commonContainers := d.containersIntersection()
+	return len(commonContainers) > 0
 }
 
-func (d *Deployment) ContainersIntersection() (c []core_v1.Container) {
+func (d *Deployment) containersIntersection() (c []core_v1.Container) {
 	for _, item := range d.new.Spec.Template.Spec.Containers {
 		if d.containsAndChanged(d.current.Spec.Template.Spec.Containers, item) {
 			c = append(c, item)
@@ -92,48 +115,55 @@ func (d *Deployment) ContainersIntersection() (c []core_v1.Container) {
 	return
 }
 
+//MetricsHandler - callback for the metrics watcher
 func (d *Deployment) MetricsHandler(rate float64) {
+	if rate >= float64(d.Threshold) {
+		logrus.Infof("It's rollback time, error rate is %v per second", rate)
+		d.DoRollback()
+	}
+}
 
+// WatchDoneHandler - called by metrics watcher when it's done
+func (d *Deployment) WatchDoneHandler(remove bool) {
+	if remove {
+		RemoveFromDeploymentWatchList(d)
+	}
+	d.Watching = false
 }
 func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Container) bool {
 	for _, item := range a {
-		if (item.Name == b.Name) && (utils.IsSameImage(item, b)) {
-			return true
+		if item.Name == b.Name {
+			if utils.IsSameImage(item, b) {
+				return false
+			}
 		}
 	}
 	return false
 }
 
-/*
-func (d *Deployment) Get()  {
-	dd, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
-	if err != nil {
-		logrus.Error(err)
-		//return nil
+// DoRollback TODO make it private
+func (d *Deployment) DoRollback() {
+
+	for _, v := range d.new.Spec.Template.Spec.Containers {
+		if meta_v1.HasAnnotation(d.new.ObjectMeta, "kuberbs.pod."+v.Name) {
+			logrus.Debug(d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])
+		}
 	}
-	data := make(map[string]string)
-	for _, v := range dd.Status.Conditions {
-		if v.Status == "Progressing" {
-		//	d.LastUpdated = v.LastUpdateTime
+	d.StopWatch(true)
+}
+
+// GetDeploymentWatchList returns the WatchList
+func GetDeploymentWatchList() *list.List {
+	return WatchList
+}
+
+// RemoveFromDeploymentWatchList - remove a deployment from the WatchList
+func RemoveFromDeploymentWatchList(d *Deployment) {
+	for e := WatchList.Front(); e != nil; e = e.Next() {
+		dp := e.Value.(*Deployment)
+		if (dp.Name == d.Name) && (dp.NameSpace == d.NameSpace) {
+			WatchList.Remove(e)
 		}
 	}
 
-	data[d.NameSpace+"-"+d.Name+"-LastUpdateTime"] = d.LastUpdated.String()
-	for _, v := range dd.Spec.Template.Spec.Containers {
-	//	d.Containers = append(d.Containers, Container{
-	//		Name:  v.Name,
-	//		Image: v.Image,
-		})
-		data[d.NameSpace+"-"+d.Name+"-Container-"+v.Name+"-Image"] = v.Image
-	}
-	//return data
 }
-
-func (d *Deployment) Save() {
-	cm := GetInstance(d.client)
-	data := d.Get()
-	cm.UpdateKeys(data)
-	cm.Save()
-
-}
-*/

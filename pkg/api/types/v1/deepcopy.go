@@ -30,9 +30,9 @@ func (in *Rbs) DeepCopyInto(out *Rbs) {
 	out.TypeMeta = in.TypeMeta
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec = RbsSpec{
-		Namespaces: in.Spec.Namespaces,
-		WatchPeriod: in.Spec.WatchPeriod,
-		MetricsSource:in.Spec.MetricsSource,
+		Namespaces:    in.Spec.Namespaces,
+		WatchPeriod:   in.Spec.WatchPeriod,
+		MetricsSource: in.Spec.MetricsSource,
 	}
 }
 

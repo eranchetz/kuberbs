@@ -20,10 +20,14 @@
 
 package metrics
 
-type MetricsHandler func(float64)
+type ErrorRateHandler func(float64)
+type DoneHandler func(bool)
 
 const CheckMetricsInterval = 10
-type Metrics interface {
-	Run() ()
-}
 
+type Metrics interface {
+	Start()
+	Stop(bool)
+	SetMetricsHandler(ErrorRateHandler)
+	SetDoneHandler(handler DoneHandler)
+}

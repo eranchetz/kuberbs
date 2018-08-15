@@ -23,9 +23,10 @@ package utils
 import (
 	"strings"
 
-	core_v1 "k8s.io/api/core/v1"
+	coreV1 "k8s.io/api/core/v1"
 )
 
-func IsSameImage(a, b core_v1.Container) bool {
+// IsSameImage compare images of 2 containers
+func IsSameImage(a, b coreV1.Container) bool {
 	return strings.EqualFold(a.Image, b.Image)
 }

@@ -32,47 +32,61 @@ import (
 	"google.golang.org/api/monitoring/v3"
 )
 
+// Stackdriver - Holds data about the stackdriver watcher
 type Stackdriver struct {
 	StartAt        time.Time
 	EndAt          time.Time
 	MetricName     string
-	MetricsHandler metrics.MetricsHandler
+	metricsHandler metrics.ErrorRateHandler
+	doneHandler    metrics.DoneHandler
+	doneChan       chan bool
 }
 
-func NewStackDriver(startat time.Time, endat time.Time, metricname string, callback metrics.MetricsHandler) *Stackdriver {
+// NewStackDriver - create new stackdriver struct
+func NewStackDriver(startat time.Time, endat time.Time, metricname string) *Stackdriver {
 	return &Stackdriver{
 		StartAt:    startat,
 		EndAt:      endat,
 		MetricName: metricname,
-		MetricsHandler:callback,
 	}
 }
 
-func (sd *Stackdriver) Run() {
+// Start - start watching
+func (sd *Stackdriver) Start() {
 	logrus.Debug("Starting Stackdriver Run")
-	logrus.Debugf("End %v Now %v", sd.EndAt, time.Now())
-	delta := sd.EndAt.Sub(time.Now())
-	logrus.Debugf("Delta is %v", delta)
+	delta := time.Until(sd.EndAt)
+	sd.doneChan = make(chan bool)
 	timeChan := time.NewTimer(delta).C
 	tickChan := time.NewTicker(time.Second * metrics.CheckMetricsInterval).C
 	for {
 		select {
-		case <-timeChan:
-			logrus.Info("We are done!")
-			return
 		case <-tickChan:
 			logrus.Debug("Tick Called")
 			rate, err := sd.checkMetrics()
 			if err != nil {
 				logrus.Fatal(err)
 			} else {
-				sd.MetricsHandler(rate)
+				sd.metricsHandler(rate)
 			}
+		case <-timeChan:
+			logrus.Debug("Timer expired. We are done!")
+			sd.doneHandler(true)
+			return
+		case remove := <-sd.doneChan:
+			logrus.Debug("Stop called. We are done!")
+			sd.doneHandler(remove)
+			return
 		}
 	}
 
 }
 
+// Stop - kill the watch time and stop watching
+func (sd *Stackdriver) Stop(remove bool) {
+	sd.doneChan <- remove
+}
+
+// checkMetrics - connect to stackdriver and call readTimeSeriesValue
 func (sd *Stackdriver) checkMetrics() (float64, error) {
 	ctx := context.Background()
 	s, err := createService(ctx)
@@ -85,16 +99,27 @@ func (sd *Stackdriver) checkMetrics() (float64, error) {
 
 }
 
+// SetMetricsHandler - set call back after reading the metrics
+func (sd *Stackdriver) SetMetricsHandler(erh metrics.ErrorRateHandler) {
+	sd.metricsHandler = erh
+}
+
+// SetDoneHandler - set the callback handler when watcher is done
+func (sd *Stackdriver) SetDoneHandler(dh metrics.DoneHandler) {
+	sd.doneHandler = dh
+
+}
+
 func readTimeSeriesValue(s *monitoring.Service, metricType string, startat time.Time) (float64, error) {
 	projectID, err := utils.ProjectName()
-	logrus.Debugf("readTimeSeriesValue for %s",projectID)
 	if err != nil {
 		logrus.Error(err)
 		//return 0, err
 		//TODO REMOVE
-		projectID="aviv-playground"
+		projectID = "aviv-playground"
 	}
-	startTime := time.Now().UTC().Add(startat.Sub(time.Now()))
+	logrus.Debugf("readTimeSeriesValue for %s", metricType)
+	startTime := time.Now().UTC().Add(time.Until(startat))
 	endTime := time.Now().UTC()
 	resp, err := s.Projects.TimeSeries.List(utils.ProjectResource(projectID)).
 		Filter(fmt.Sprintf("metric.type=\"%s\"", metricType)).
@@ -105,8 +130,7 @@ func readTimeSeriesValue(s *monitoring.Service, metricType string, startat time.
 		logrus.Error(err)
 		return 0.0, fmt.Errorf("Could not read time series value, %v ", err)
 	}
-	var errSum int64
-	errSum = 0
+	errSum := int64(0)
 	if len(resp.TimeSeries) != 0 {
 		for _, p := range resp.TimeSeries[0].Points {
 			errSum = errSum + *p.Value.Int64Value
@@ -114,7 +138,7 @@ func readTimeSeriesValue(s *monitoring.Service, metricType string, startat time.
 		logrus.Debugf("errSum %d", errSum)
 		return float64(errSum) / endTime.Sub(startTime).Seconds(), nil
 	}
-	return 0,nil
+	return 0, nil
 }
 
 func createService(ctx context.Context) (*monitoring.Service, error) {
