@@ -28,7 +28,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const RbsNameSpace = "default"
+//TODO default for local kube-system for remote
+const RbsNameSpace = "kube-system"
 
 type RbsInterface interface {
 	List(opts metav1.ListOptions) (*v1.RbsList, error)

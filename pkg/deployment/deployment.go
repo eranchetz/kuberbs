@@ -29,7 +29,6 @@ import (
 	"github.com/doitintl/kuberbs/pkg/metrics"
 	"github.com/doitintl/kuberbs/pkg/utils"
 	apps_v1 "k8s.io/api/apps/v1"
-	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -68,26 +67,32 @@ func NewDeploymentController(kubeClient kubernetes.Interface, current *apps_v1.D
 
 // SaveCurrentDeploymentState - store image version of current deployment as an annotation
 func (d *Deployment) SaveCurrentDeploymentState() error {
+	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	d.new = dp
 	if d.new != nil {
 		for _, v := range d.current.Spec.Template.Spec.Containers {
 			meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.pod."+v.Name, v.Image)
 		}
-		meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.starttime", time.Now().String())
+		meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.starttime", time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
 		_, err := d.client.AppsV1().Deployments(d.new.Namespace).Update(d.new)
 		if err != nil {
 			logrus.Error(err)
 			return err
 		}
 	} else {
-		logrus.Debug("No new deployment object found")
-		return fmt.Errorf("No new deployment object found, %v ", d.current.Name)
+		logrus.Debug("No NewDp deployment object found")
+		return fmt.Errorf("No NewDp deployment object found, %v ", d.current.Name)
 	}
 	return nil
 }
 
 // StartWatch - start the metrcis watcher
 func (d *Deployment) StartWatch(m metrics.Metrics) {
-	logrus.Debugf("Calling m.Run for %s @ %s", d.Name, d.NameSpace)
+	logrus.Debugf("Startg to Watch! Calling m.Run for %s@%s", d.Name, d.NameSpace)
 	d.Watching = true
 	d.metrics = m
 	go m.Start()
@@ -105,24 +110,13 @@ func (d *Deployment) StopWatch(remove bool) {
 
 // ShouldWatch do we have containers to watch
 func (d *Deployment) ShouldWatch() bool {
-	commonContainers := d.containersIntersection()
-	return len(commonContainers) > 0
-}
-
-func (d *Deployment) containersIntersection() (c []core_v1.Container) {
-	for _, item := range d.new.Spec.Template.Spec.Containers {
-		if d.containsAndChanged(d.current.Spec.Template.Spec.Containers, item) {
-			c = append(c, item)
-		}
-
-	}
-	return
+	return utils.ShouldWatch(d.current, d.new)
 }
 
 //MetricsHandler - callback for the metrics watcher
 func (d *Deployment) MetricsHandler(rate float64) {
 	if rate >= float64(d.Threshold) {
-		logrus.Infof("It's rollback time, error rate is %v per second", rate)
+		logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "error-rate": rate}).Info("It's rollback time")
 		err := d.doRollback()
 		if err != nil {
 			logrus.Errorf("Rollback failed", err)
@@ -149,21 +143,16 @@ func (d *Deployment) WatchDoneHandler(remove bool) error {
 	d.Watching = false
 	return nil
 }
-func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Container) bool {
-	for _, item := range a {
-		if item.Name == b.Name {
-			if !utils.IsSameImage(item, b) {
-				return true
-			}
-		}
-	}
-	return false
+
+//IsObservedGenerationSame - any change between deployments?
+func (d *Deployment) IsObservedGenerationSame() bool {
+	return d.new.Status.ObservedGeneration == d.current.Status.ObservedGeneration
 }
 
 // doRollback - do the actual rollback
 func (d *Deployment) doRollback() error {
 	d.IsRollback = true
-	logrus.Infof("Starting rollback for %s@%s", d.Name, d.NameSpace)
+	logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": d.NameSpace, "name": d.Name}).Infof("Starting rollback")
 	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
 	if err != nil {
 		logrus.Error(err)
@@ -186,7 +175,7 @@ func (d *Deployment) doRollback() error {
 		return err
 	}
 	d.StopWatch(true)
-	logrus.Infof("Rollback done for %s@%s", d.Name, d.NameSpace)
+	logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": d.NameSpace, "name": d.Name}).Infof("Rollback done")
 	return nil
 }
 

@@ -25,7 +25,9 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+
 	apps_v1 "k8s.io/api/apps/v1"
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -93,4 +95,31 @@ func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
 
 	}
 	return objectMeta
+}
+
+// ShouldWatch do we have containers to watch
+func ShouldWatch(old, new *apps_v1.Deployment) bool {
+	commonContainers := containersIntersection(old, new)
+	return len(commonContainers) > 0
+}
+
+func containersIntersection(old, new *apps_v1.Deployment) (c []core_v1.Container) {
+	for _, item := range new.Spec.Template.Spec.Containers {
+		if containsAndChanged(old.Spec.Template.Spec.Containers, item) {
+			c = append(c, item)
+		}
+
+	}
+	return
+}
+
+func containsAndChanged(a []core_v1.Container, b core_v1.Container) bool {
+	for _, item := range a {
+		if item.Name == b.Name {
+			if !IsSameImage(item, b) {
+				return true
+			}
+		}
+	}
+	return false
 }

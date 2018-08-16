@@ -3,7 +3,7 @@ kind: Rbs
 metadata:
     name: my-rbs-example
 spec:
-  watchperiod: 1
+  watchperiod: 5
   metricssource: stackdriver
   namespaces:
   - name: default
@@ -11,7 +11,7 @@ spec:
     - deployment:
         name: hello-kubernetes
         metric: logging.googleapis.com/user/hello-kubernetes
-        threshold: 5
+        threshold: 1
     - deployment:
         name: foo
         metric: logging.googleapis.com/user/bar

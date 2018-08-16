@@ -121,8 +121,7 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 				newEvent.resourceType = resourceType
 				newEvent.old = old.(*apps_v1.Deployment)
 				newEvent.new = new.(*apps_v1.Deployment)
-
-				logrus.WithField("pkg", "kuberbs-"+resourceType).Debugf("Processing update to %v: %s", resourceType, newEvent.key)
+				logrus.WithFields(logrus.Fields{"pkg": "kuberbs-", "resourceType": resourceType, "newEvent.key": newEvent.key}).Debug("Processing update")
 				if err == nil {
 					queue.Add(newEvent)
 				}
@@ -256,18 +255,11 @@ func (c *Controller) processItem(newEvent Event) error {
 			}
 		}
 		if isNewDeployment {
-
 			if status {
 				newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
-				err = newDeployment.SaveCurrentDeploymentState()
-				if err != nil {
-					logrus.Error(err)
-					return nil
-				}
 				deploymentWatchList.PushBack(newDeployment)
-				logrus.Infof("Found a new deployment to handle namespace %s name %s", newEvent.old.ObjectMeta.Namespace, newEvent.old.ObjectMeta.Name)
+				logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Go a state change")
 			}
-
 			return nil
 		}
 		if !dp.DeploymentComplete(newEvent.new) {
@@ -279,25 +271,33 @@ func (c *Controller) processItem(newEvent Event) error {
 			deployment.RemoveFromDeploymentWatchList(dp)
 			return nil
 		}
-		if newEvent.new.Status.ObservedGeneration != newEvent.old.Status.ObservedGeneration {
+		if dp.IsRollback {
 			return nil
 		}
-		if !dp.IsRollback {
-			var m metrics.Metrics
-			et := time.Now().Add(time.Duration(watchPeriod) * time.Minute)
-			switch metricsSource {
-			case "stackdriver":
-				m = st.NewStackDriver(time.Now(), et, metricName)
-				m.SetMetricsHandler(dp.MetricsHandler)
-				m.SetDoneHandler(dp.WatchDoneHandler)
-			default:
+		dp.IsObservedGenerationSame()
+		et := time.Now().Add(time.Duration(watchPeriod) * time.Minute)
+		if (dp.Watching) && (utils.ShouldWatch(newEvent.old, newEvent.new)) {
+			dp.StopWatch(true)
+			dp = deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
+			deploymentWatchList.PushBack(dp)
+			err = dp.SaveCurrentDeploymentState()
+			if err != nil {
+				logrus.Error(err)
 				return nil
 			}
-			if dp.Watching {
-				dp.StopWatch(false)
+		} else {
+			if !dp.IsObservedGenerationSame() {
+				return nil
 			}
-			go dp.StartWatch(m)
+			err = dp.SaveCurrentDeploymentState()
+			if err != nil {
+				logrus.Error(err)
+				return nil
+			}
 		}
+		m := setWatcher(metricsSource, metricName, et, dp)
+		go dp.StartWatch(*m)
+
 		return nil
 
 	case "create":
@@ -307,6 +307,7 @@ func (c *Controller) processItem(newEvent Event) error {
 	}
 	return nil
 }
+
 func (c *Controller) loadDeployments() {
 	var metricsSource, metricName string
 	rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
@@ -328,26 +329,20 @@ func (c *Controller) loadDeployments() {
 					t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", tstr)
 					if err != nil {
 						logrus.Error(err)
-						panic(err)
+						continue
 					}
 					t = t.Add(time.Duration(watchPeriod) * time.Minute)
 					if time.Now().Before(t) {
+
+						logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namesapce": dp.Namespace, "name": dp.Name}).Info("Found a un finished watch task!")
 						metricName = d.Deployment.Metric
 						threshold := d.Deployment.Threshold
 						old := c.createOldDeployment(dp)
 						newDeployment := deployment.NewDeploymentController(c.client, old, dp, threshold)
-						var m metrics.Metrics
-						switch metricsSource {
-						case "stackdriver":
-							m = st.NewStackDriver(time.Now(), t, metricName)
-							m.SetMetricsHandler(newDeployment.MetricsHandler)
-							m.SetDoneHandler(newDeployment.WatchDoneHandler)
-						default:
-							return
-						}
+						m := setWatcher(metricsSource, metricName, t, newDeployment)
 						deploymentWatchList := deployment.GetDeploymentWatchList()
 						deploymentWatchList.PushBack(newDeployment)
-						go newDeployment.StartWatch(m)
+						go newDeployment.StartWatch(*m)
 					}
 				}
 			}
@@ -367,4 +362,17 @@ func (c *Controller) createOldDeployment(current *apps_v1.Deployment) *apps_v1.D
 		}
 	}
 	return old
+}
+
+func setWatcher(metricsSource string, metricName string, et time.Time, newDeployment *deployment.Deployment) *metrics.Metrics {
+	var m metrics.Metrics
+	switch metricsSource {
+	case "stackdriver":
+		m = st.NewStackDriver(time.Now(), et, metricName)
+		m.SetMetricsHandler(newDeployment.MetricsHandler)
+		m.SetDoneHandler(newDeployment.WatchDoneHandler)
+		return &m
+	default:
+		return &m
+	}
 }
