@@ -21,7 +21,7 @@
 package metrics
 
 type ErrorRateHandler func(float64)
-type DoneHandler func(bool)
+type DoneHandler func(bool) error
 
 const CheckMetricsInterval = 10
 

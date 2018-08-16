@@ -23,6 +23,7 @@ package deployment
 import (
 	"container/list"
 	"fmt"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/doitintl/kuberbs/pkg/metrics"
@@ -71,6 +72,7 @@ func (d *Deployment) SaveCurrentDeploymentState() error {
 		for _, v := range d.current.Spec.Template.Spec.Containers {
 			meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.pod."+v.Name, v.Image)
 		}
+		meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.starttime", time.Now().String())
 		_, err := d.client.AppsV1().Deployments(d.new.Namespace).Update(d.new)
 		if err != nil {
 			logrus.Error(err)
@@ -98,7 +100,7 @@ func (d *Deployment) DeploymentComplete(newd *apps_v1.Deployment) bool {
 
 // StopWatch - stop the metrics watcher
 func (d *Deployment) StopWatch(remove bool) {
-	d.metrics.Stop(false)
+	d.metrics.Stop(remove)
 }
 
 // ShouldWatch do we have containers to watch
@@ -121,16 +123,31 @@ func (d *Deployment) containersIntersection() (c []core_v1.Container) {
 func (d *Deployment) MetricsHandler(rate float64) {
 	if rate >= float64(d.Threshold) {
 		logrus.Infof("It's rollback time, error rate is %v per second", rate)
-		d.DoRollback()
+		err := d.doRollback()
+		if err != nil {
+			logrus.Errorf("Rollback failed", err)
+		}
 	}
 }
 
 // WatchDoneHandler - called by metrics watcher when it's done
-func (d *Deployment) WatchDoneHandler(remove bool) {
+func (d *Deployment) WatchDoneHandler(remove bool) error {
+	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	meta_v1.SetMetaDataAnnotation(&dp.ObjectMeta, "kuberbs.starttime", "")
+	_, err = d.client.AppsV1().Deployments(d.new.Namespace).Update(dp)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
 	if remove {
 		RemoveFromDeploymentWatchList(d)
 	}
 	d.Watching = false
+	return nil
 }
 func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Container) bool {
 	for _, item := range a {
@@ -143,15 +160,34 @@ func (d *Deployment) containsAndChanged(a []core_v1.Container, b core_v1.Contain
 	return false
 }
 
-// DoRollback TODO make it private
-func (d *Deployment) DoRollback() {
+// doRollback - do the actual rollback
+func (d *Deployment) doRollback() error {
 	d.IsRollback = true
+	logrus.Infof("Starting rollback for %s@%s", d.Name, d.NameSpace)
+	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
 	for _, v := range d.new.Spec.Template.Spec.Containers {
 		if meta_v1.HasAnnotation(d.new.ObjectMeta, "kuberbs.pod."+v.Name) {
-			logrus.Debug(d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])
+			for i, item := range dp.Spec.Template.Spec.Containers {
+				if item.Name == v.Name {
+					logrus.Debugf("Reverting from %s to %s", dp.Spec.Template.Spec.Containers[i].Image, d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])
+					dp.Spec.Template.Spec.Containers[i].Image = d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name]
+				}
+			}
+
 		}
 	}
+	_, err = d.client.AppsV1().Deployments(d.new.Namespace).Update(dp)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
 	d.StopWatch(true)
+	logrus.Infof("Rollback done for %s@%s", d.Name, d.NameSpace)
+	return nil
 }
 
 // GetDeploymentWatchList returns the WatchList

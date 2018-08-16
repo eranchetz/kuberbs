@@ -57,7 +57,6 @@ var serverStartTime time.Time
 type Event struct {
 	key          string
 	eventType    string
-	namespace    string
 	resourceType string
 	old          *apps_v1.Deployment
 	new          *apps_v1.Deployment
@@ -65,13 +64,14 @@ type Event struct {
 
 // Controller object
 type Controller struct {
-	logger     *logrus.Entry
-	client     kubernetes.Interface
-	clinet_set *client_v1.V1Client
-	queue      workqueue.RateLimitingInterface
-	informer   cache.SharedIndexInformer
+	logger    *logrus.Entry
+	client    kubernetes.Interface
+	clinetSet *client_v1.V1Client
+	queue     workqueue.RateLimitingInterface
+	informer  cache.SharedIndexInformer
 }
 
+// Start - starts the controller
 func Start(conf *config.Config) {
 	var kubeClient kubernetes.Interface
 	_, err := rest.InClusterConfig()
@@ -112,16 +112,8 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 	var newEvent Event
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			return
 		},
 		UpdateFunc: func(old, new interface{}) {
-
-			/*dd := new.(*apps_v1beta1.Deployment)
-			for b, a := range dd.ObjectMeta.Annotations {
-				if strings.HasPrefix(b, "kuberbs.") {
-					logrus.Debug(b, a)
-				}
-			}*/
 			if utils.IsStrategySupported(string(new.(*apps_v1.Deployment).Spec.Strategy.Type)) {
 				var err error
 				newEvent.key, err = cache.MetaNamespaceKeyFunc(old)
@@ -137,7 +129,6 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			return
 		},
 	})
 	var cfg *rest.Config
@@ -155,11 +146,11 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 	}
 
 	return &Controller{
-		logger:     logrus.WithField("pkg", "kuberbs-"+resourceType),
-		client:     client,
-		informer:   informer,
-		queue:      queue,
-		clinet_set: clientSet,
+		logger:    logrus.WithField("pkg", "kuberbs-"+resourceType),
+		client:    client,
+		informer:  informer,
+		queue:     queue,
+		clinetSet: clientSet,
 	}
 }
 
@@ -170,7 +161,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	c.logger.Info("Starting kuberbs controller")
 	serverStartTime = time.Now().Local()
-
+	c.loadDeployments()
 	go c.informer.Run(stopCh)
 
 	if !cache.WaitForCacheSync(stopCh, c.HasSynced) {
@@ -245,7 +236,7 @@ func (c *Controller) processItem(newEvent Event) error {
 		}
 		logrus.Debugf("%s is new deployment %v ", newEvent.old.Name, isNewDeployment)
 		status := false
-		rbs, err := c.clinet_set.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
+		rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -268,13 +259,18 @@ func (c *Controller) processItem(newEvent Event) error {
 
 			if status {
 				newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
+				err = newDeployment.SaveCurrentDeploymentState()
+				if err != nil {
+					logrus.Error(err)
+					return nil
+				}
 				deploymentWatchList.PushBack(newDeployment)
 				logrus.Infof("Found a new deployment to handle namespace %s name %s", newEvent.old.ObjectMeta.Namespace, newEvent.old.ObjectMeta.Name)
 			}
 
 			return nil
 		}
-		if dp.DeploymentComplete(newEvent.new) != true {
+		if !dp.DeploymentComplete(newEvent.new) {
 			logrus.Debugf("Deployment still in progress %s", dp.Name)
 			return nil
 		}
@@ -301,8 +297,6 @@ func (c *Controller) processItem(newEvent Event) error {
 				dp.StopWatch(false)
 			}
 			go dp.StartWatch(m)
-			//TODO remove once testing is done
-			dp.DoRollback()
 		}
 		return nil
 
@@ -312,4 +306,65 @@ func (c *Controller) processItem(newEvent Event) error {
 		return nil
 	}
 	return nil
+}
+func (c *Controller) loadDeployments() {
+	var metricsSource, metricName string
+	rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	watchPeriod := rbs.Items[0].Spec.WatchPeriod
+	metricsSource = strings.ToLower(rbs.Items[0].Spec.MetricsSource)
+	for i, ns := range rbs.Items[0].Spec.Namespaces {
+		for _, d := range rbs.Items[0].Spec.Namespaces[i].Deployments {
+			dp, err := c.client.AppsV1().Deployments(ns.Name).Get(d.Deployment.Name, meta_v1.GetOptions{})
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			if meta_v1.HasAnnotation(dp.ObjectMeta, "kuberbs.starttime") {
+				tstr := dp.ObjectMeta.Annotations["kuberbs.starttime"]
+				if tstr != "" {
+					t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", tstr)
+					if err != nil {
+						logrus.Error(err)
+						panic(err)
+					}
+					t = t.Add(time.Duration(watchPeriod) * time.Minute)
+					if time.Now().Before(t) {
+						metricName = d.Deployment.Metric
+						threshold := d.Deployment.Threshold
+						old := c.createOldDeployment(dp)
+						newDeployment := deployment.NewDeploymentController(c.client, old, dp, threshold)
+						var m metrics.Metrics
+						switch metricsSource {
+						case "stackdriver":
+							m = st.NewStackDriver(time.Now(), t, metricName)
+							m.SetMetricsHandler(newDeployment.MetricsHandler)
+							m.SetDoneHandler(newDeployment.WatchDoneHandler)
+						default:
+							return
+						}
+						deploymentWatchList := deployment.GetDeploymentWatchList()
+						deploymentWatchList.PushBack(newDeployment)
+						go newDeployment.StartWatch(m)
+					}
+				}
+			}
+		}
+	}
+}
+
+func (c *Controller) createOldDeployment(current *apps_v1.Deployment) *apps_v1.Deployment {
+	old := current
+	for _, v := range current.Spec.Template.Spec.Containers {
+		if meta_v1.HasAnnotation(current.ObjectMeta, "kuberbs.pod."+v.Name) {
+			for i, item := range current.Spec.Template.Spec.Containers {
+				if item.Name == v.Name {
+					old.Spec.Template.Spec.Containers[i].Image = current.ObjectMeta.Annotations["kuberbs.pod."+v.Name]
+				}
+			}
+		}
+	}
+	return old
 }
