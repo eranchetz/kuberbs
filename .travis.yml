@@ -1,15 +1,16 @@
 language: go
 sudo: required
-
 services:
 - docker
-
 env:
   matrix:
   - DEP_VERSION=0.4.1
   global:
   - secure: Uhwe0SJzDINKpulrz4iKSvBchv/4w/PdeP0+BIM+5V0F4M4/v+BYk0cFS3cOiyyNXrnxL4wl0guzhLg1uWt9ZXEd4eXUyFgbeZ52C8pzRgCahIpSc3XFqYaFoxkdMKTUjfbsuUbOcCwlaIzM8QvfXGkw6Y5Gs9rPbb9U12qgthafLYFvyOXn/V5ddFsDvm3PT8Nr8AQWIDtuXwi9vEsyADZiOxVXSZSoThYc4vshGL9nr8kTAlJ5oO0DNTeAmoMgBYysqNr5R/3RZTvGVH3BJIWINLTZxVgkRsbSzeFMjfEKrmLBlYYZRg/tL//yzqNDRyvhD1G3oEiqDQC+bZQ3BNy0ok2L4+ytDfAPk7S31dZ/gcb2RCIeMMN2PuBpmmTZyfY921A9VEcNdq8JIXXLQOr9Axi0EAbLCsBetcoqXj+6tSU1/N3/pv1WT192MoGCvzM3A3he0KBLFTky1ZCwGbGl8QogP61ku1fgp9oU4VjwaT4gDsJxMJ0pgXpPmZy11oUwH5V0xpF+9zQ7L0tIyuYW+064SgPM70vqtUSkUQ6Tvy61AKfJY9nZfKlx3Xr0uUwJEx33yT6BmMPNDcYkT3ENfCtaYAhF/sxQijrz/vdhyK0oiKpSYwowbxMCpCY/Qy8HShoSqqKJsjjtPF/lvKgWGr0b/spC6ei50pqD6Zk=
   - secure: RvXxbo3+WYXgVfLHycauP4ePoLzjiG0L/iqEXOOyRvThIBO/2CjAJebPzxStd0T8UKmgQQuY6sPGA+gzTKqRm7X3h8i++BLuVGN/ohmug6SqoAt+b5DlAc571CpnRDdDuPWbiStLZFHfFTpcJn3NPe2h6dA/JAaPeUwdWjiGueR/cEpfuqINQnZh6F0IY6vFN0KU5kOh8LSn+WwukR/EtlDyGINMR6yUHpVF+q137L4aPUKeLpztw+6aOtU5KmyciYNG6SGckj5WZedAu4miPtH/jLD+UaQh3Tr4dGWBPduis94M+bE9seMEBDH83HF7+BUkNgRsQoKY85Gntu4apNQA0G04hN26fodkZCzvgXuISlmhP4DaemeEDImT7tWesL5Wms9GtKGpDfdWqjfHh9Vaq9AuGsloEW7CyT6+FuLBQErJMSu27jWXgSNwZsT9DpEUwZDG7lFm1OZqrLM/SUBGAsmHDswG7H1wlFD5aUd01CqSqKwMoEBj8BCqVRO+WtKHjsIZvCXgudlZySlLS5di15nYDaZYPQ+KB0/CpS0NaTP6k3KF1zmtWT7T2jKdFv9Sfgji4eYvvKubVLjsHmT1RsbFmCoDFhpKDNvYC/XlERzmAJYFyRdvELF8EjWpadJv/rR22PexyGCRoMe/17WGRGXMCEtpZiDTYKYDquc=
+  - secure: ofzShA5fhvKOXyIhPiM5FVes5jJiCgDmhT7tkoEwb3czWIj0uIBgPPbbh7lysoYrX3EV+OYCCOuA8k7Ir3NjDcBH6D/1EkFfe+NtvLsGJnQub2FffegHaTzOPJpySyDbwDZnAIrHSrW/7u26Y/WbJA+iKzicjUnzVnRc+06iVfL1dWiBRA1Eiel9nwMlWZq9oGNJW6lRsT3bID5xjlWEwYP/9qrlcISbqtPDk/quVF3HbfJUB2/GP4wFYfmG3w+dDAhKnGJSJQoknfB4knO0v8YV5sDdHGyyVCGKE+6L1f+Obq0SvwkaQ+foXISPPWp+QfQHidW9xZltYSngH2lq5Qvfd3SWzXQn/vRrOfxQ51BZLpYQZNPhazJQ3cmDqYnQ2B3kijJCFzMg+qZNAnG1OgQ3E8vBhRE43sKV4nnGnY4r2Huw0EdsA5bf3NNTWdRpnf++h1Mxcvl5vrEex8ejXPSPaKNeBE0L4BEbiiSj/fEIKcKPiHqAeDRW82gilP+NBrWPRBc7Sy95PazMJ6n5nmONxvgU1g6rQpVbzZefDPqW5XuQvlebG+xdeDz90YnwOcmZIyfft7DJQx1zJQ/8zSzzCA9WVv49XT1EPg9TPbu/ipquNJEVfhDbGPAgePJiBPybs61Fs4W1p9vl5daaKuvnPYhHpwIKCTCjQaL7w4w=
+  - secure: Tr1ALaxEyPlTqk626hkDFe7HHSCK1wIXyYDQ4IfmkWUu292+Gfs+ytxHcRqE4a8HUetC7lG0vQPeC0HO419end5hpPu60pPkFVz+BXWt4S9ZaGk9ERyZPAVPGnG6QKokgnnVX71f2Eq57ogsas8DgCBSlz3UllIgi905GWd5mku7Gv31kVzmwRsY58iYK+KBz+vPEKw1f6QNLHvHUJGXUD8/CAzR7sQf+J7c8AVZSHxadePu25UVQC3H+c7rksSmiz89SKib6RBU9UAl9ZaSxEBHfGZpP+Wr85zAVHq+HKM94A3HppUD7/bokt4ck/eWK8h3L7GdiwOrTEcw2hE+hF73+WL2S8g092NIToLeNAnQ5mvNVkhX4LQ+FMX7NBHxmQmmNEE5ziC2lw+pEIgJNI1WzQ/pBXL6E5skk+xeVbIrAHg4EnXMMWb0CzkrwHUy/lY1Xjg+ZKYpg421i7KlCP0bVlWHy1G8P87cr4BBBVhMM5B3aK1x8194xGzZAvauNVjz5F/3xv4IHiJXPZgY7ojwQZD/gPERWB1S5gRbCTDp0igfqbOVVohzqVnP+nybX5/AoqZERRLLwguxcA/iZJKvDWcI9nd78Mu/Zgda4aLBf0dHxng6Ohqd1YWqiUlMfKC2DkSdkO3bohZd6d4mNSvo4xHCkQpgvcrIqrVgi/I=
+  - secure: eytHkcu+RUgY+aMcrysY2UB2c34u/JSAUnu7UHAgfgba1uryW++RgmHP+v0PdK99E1kSUgUTm4i+1gfaWNNLSuCGKp1QEMUuOwxFXLUnVJZGgHbiaRTjhq5jiZ/Ha8kQse7Q7EgWKZCLXQdm0PkT0B+4afIhn5aN81kMbtaD6MpwpgZz/zFiJyOBjQ7gC7figB9sK+dOPCTSLskkUsyktOQimlaCrvlSTPcGfl41lbDiHD8Z+emG9VthEnNMusP936W/FYdIG5MhJVImV5D36SI4MoGncSLzlKc3jzKJqpjQkBufBM9c3Hwatfjp2CRo8SUnHGcMV2cXtjiwhCYMih6wufM/J2uPoggtxdXzsxUNFM8PTPbtFKqfWoUQ5AoS+8xJa1rmfaVUa734KI3ATv4OhF4L8i01XTcPJGCgoAf+yTYByLlIqNeSV3hku+Xxzebbr2nbCN50OtVXLlOKfdGnXoKa3AQpX33jBaZ8kBK6VWBGfb9oBDPGONsq9NtzHQdpxilXxZ+w5aUzLowYJ1fIufLqnjiJ8pH7xi8a8ml9NVAwrqL9+4hXdAe96V48iKKKCPjpk754dtFbkfSWAe6tDG4lcxF7fHhyiNAt3f2A4WYrrY8QsZslrDLU13ZQz9CUoz9ZwU006GJntxAmDzvgxypAfPHkiHvqRIBiOmI=
 go:
 - 1.10.2
 before_install:
@@ -17,17 +18,17 @@ before_install:
   -o $GOPATH/bin/dep
 - chmod +x $GOPATH/bin/dep
 install:
-  -  $GOPATH/bin/dep ensure
-
+- "$GOPATH/bin/dep ensure"
 script:
 - export BUILD_DATE=`date +%Y-%m-%d\-%H:%M`
 - export VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
 - export BUILDER=kuberbs-builder
-- export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
+- export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH;
+  fi`
 - export REPO=doitintl/kuberbs
-- docker build -t $BUILDER --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile.build .
+- docker build -t $BUILDER --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE}
+  -f Dockerfile.build .
 - docker run --rm $BUILDER | docker build -t $REPO:$TAG -f Dockerfile.run -
-
 after_success:
 - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 - echo $TAG
