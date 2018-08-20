@@ -1,9 +1,7 @@
 language: go
 sudo: required
-
 services:
 - docker
-
 env:
   matrix:
   - DEP_VERSION=0.4.1
@@ -17,17 +15,17 @@ before_install:
   -o $GOPATH/bin/dep
 - chmod +x $GOPATH/bin/dep
 install:
-  -  $GOPATH/bin/dep ensure
-
+- "$GOPATH/bin/dep ensure"
 script:
 - export BUILD_DATE=`date +%Y-%m-%d\-%H:%M`
 - export VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
 - export BUILDER=kuberbs-builder
-- export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
+- export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH;
+  fi`
 - export REPO=doitintl/kuberbs
-- docker build -t $BUILDER --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile.build .
+- docker build -t $BUILDER --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE}
+  -f Dockerfile.build .
 - docker run --rm $BUILDER | docker build -t $REPO:$TAG -f Dockerfile.run -
-
 after_success:
 - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 - echo $TAG
