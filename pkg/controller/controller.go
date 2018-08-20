@@ -258,7 +258,7 @@ func (c *Controller) processItem(newEvent Event) error {
 			if status {
 				newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
 				deploymentWatchList.PushBack(newDeployment)
-				logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Go a state change")
+				logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Got a state change")
 			}
 			return nil
 		}
