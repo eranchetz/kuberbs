@@ -36,6 +36,7 @@ import (
 type Stackdriver struct {
 	StartAt        time.Time
 	EndAt          time.Time
+	logger         *logrus.Entry
 	MetricName     string
 	metricsHandler metrics.ErrorRateHandler
 	doneHandler    metrics.DoneHandler
@@ -48,12 +49,13 @@ func NewStackDriver(startat time.Time, endat time.Time, metricname string) *Stac
 		StartAt:    startat,
 		EndAt:      endat,
 		MetricName: metricname,
+		logger:     logrus.WithFields(logrus.Fields{"service": "kuberbs", "pkg": "stackdriver"}),
 	}
 }
 
 // Start - start watching
 func (sd *Stackdriver) Start() {
-	logrus.Debug("Starting Stackdriver Run")
+	sd.logger.Info("Starting Stackdriver Run")
 	delta := time.Until(sd.EndAt)
 	sd.doneChan = make(chan bool)
 	timeChan := time.NewTimer(delta).C
@@ -64,16 +66,16 @@ func (sd *Stackdriver) Start() {
 			logrus.Debug("Tick Called")
 			rate, err := sd.checkMetrics()
 			if err != nil {
-				logrus.Fatal(err)
+				sd.logger.Fatal(err)
 			} else {
 				sd.metricsHandler(rate)
 			}
 		case <-timeChan:
-			logrus.Debug("Timer expired. We are done!")
+			sd.logger.Debug("Timer expired. We are done!")
 			sd.doneHandler(true)
 			return
 		case remove := <-sd.doneChan:
-			logrus.Debug("Stop called. We are done!")
+			sd.logger.Debug("Stop called. We are done!")
 			sd.doneHandler(remove)
 			return
 		}
@@ -91,7 +93,7 @@ func (sd *Stackdriver) checkMetrics() (float64, error) {
 	ctx := context.Background()
 	s, err := createService(ctx)
 	if err != nil {
-		logrus.Fatal(err)
+		sd.logger.Fatal(err)
 		return 0, err
 	}
 	metricType := sd.MetricName

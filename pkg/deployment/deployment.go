@@ -40,6 +40,7 @@ var WatchList = list.New()
 type Deployment struct {
 	Name       string
 	NameSpace  string
+	logger     *logrus.Entry
 	Threshold  int
 	metrics    metrics.Metrics
 	Watching   bool
@@ -53,6 +54,7 @@ type Deployment struct {
 func NewDeploymentController(kubeClient kubernetes.Interface, current *apps_v1.Deployment, new *apps_v1.Deployment, threshold int) *Deployment {
 
 	d := &Deployment{
+		logger:     logrus.WithFields(logrus.Fields{"service": "kuberbs", "pkg": "deployment", "name": current.Name, "namespace": current.Namespace}),
 		Name:       current.Name,
 		NameSpace:  current.Namespace,
 		Threshold:  threshold,
@@ -80,11 +82,11 @@ func (d *Deployment) SaveCurrentDeploymentState() error {
 		meta_v1.SetMetaDataAnnotation(&d.new.ObjectMeta, "kuberbs.starttime", time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
 		_, err := d.client.AppsV1().Deployments(d.new.Namespace).Update(d.new)
 		if err != nil {
-			logrus.Error(err)
+			d.logger.Error(err)
 			return err
 		}
 	} else {
-		logrus.Debug("No NewDp deployment object found")
+		d.logger.Debug("No NewDp deployment object found")
 		return fmt.Errorf("No NewDp deployment object found, %v ", d.current.Name)
 	}
 	return nil
@@ -92,7 +94,7 @@ func (d *Deployment) SaveCurrentDeploymentState() error {
 
 // StartWatch - start the metrcis watcher
 func (d *Deployment) StartWatch(m metrics.Metrics) {
-	logrus.Debugf("Startg to Watch! Calling m.Run for %s@%s", d.Name, d.NameSpace)
+	d.logger.Debug("Starting to Watch! Calling m.Run")
 	d.Watching = true
 	d.metrics = m
 	go m.Start()
@@ -116,10 +118,10 @@ func (d *Deployment) ShouldWatch() bool {
 //MetricsHandler - callback for the metrics watcher
 func (d *Deployment) MetricsHandler(rate float64) {
 	if rate >= float64(d.Threshold) {
-		logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "error-rate": rate}).Info("It's rollback time")
+		d.logger.WithFields(logrus.Fields{"error-rate": rate}).Info("It's rollback time")
 		err := d.doRollback()
 		if err != nil {
-			logrus.Errorf("Rollback failed", err)
+			d.logger.Errorf("Rollback failed", err)
 		}
 	}
 }
@@ -128,13 +130,13 @@ func (d *Deployment) MetricsHandler(rate float64) {
 func (d *Deployment) WatchDoneHandler(remove bool) error {
 	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
 	if err != nil {
-		logrus.Error(err)
+		d.logger.Error(err)
 		return err
 	}
 	meta_v1.SetMetaDataAnnotation(&dp.ObjectMeta, "kuberbs.starttime", "")
 	_, err = d.client.AppsV1().Deployments(d.new.Namespace).Update(dp)
 	if err != nil {
-		logrus.Error(err)
+		d.logger.Error(err)
 		return err
 	}
 	if remove {
@@ -152,17 +154,17 @@ func (d *Deployment) IsObservedGenerationSame() bool {
 // doRollback - do the actual rollback
 func (d *Deployment) doRollback() error {
 	d.IsRollback = true
-	logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": d.NameSpace, "name": d.Name}).Infof("Starting rollback")
+	d.logger.WithFields(logrus.Fields{}).Infof("Starting rollback")
 	dp, err := d.client.AppsV1().Deployments(d.NameSpace).Get(d.Name, meta_v1.GetOptions{})
 	if err != nil {
-		logrus.Error(err)
+		d.logger.Error(err)
 		return err
 	}
 	for _, v := range d.new.Spec.Template.Spec.Containers {
 		if meta_v1.HasAnnotation(d.new.ObjectMeta, "kuberbs.pod."+v.Name) {
 			for i, item := range dp.Spec.Template.Spec.Containers {
 				if item.Name == v.Name {
-					logrus.Debugf("Reverting from %s to %s", dp.Spec.Template.Spec.Containers[i].Image, d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])
+					d.logger.Debugf("Reverting from %s to %s", dp.Spec.Template.Spec.Containers[i].Image, d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name])
 					dp.Spec.Template.Spec.Containers[i].Image = d.new.ObjectMeta.Annotations["kuberbs.pod."+v.Name]
 				}
 			}
@@ -175,7 +177,7 @@ func (d *Deployment) doRollback() error {
 		return err
 	}
 	d.StopWatch(true)
-	logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": d.NameSpace, "name": d.Name}).Infof("Rollback done")
+	d.logger.WithFields(logrus.Fields{}).Infof("Rollback done")
 	return nil
 }
 

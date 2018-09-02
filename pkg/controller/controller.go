@@ -121,7 +121,7 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 				newEvent.resourceType = resourceType
 				newEvent.old = old.(*apps_v1.Deployment)
 				newEvent.new = new.(*apps_v1.Deployment)
-				logrus.WithFields(logrus.Fields{"pkg": "kuberbs-", "resourceType": resourceType, "newEvent.key": newEvent.key}).Debug("Processing update")
+				//logrus.WithFields(logrus.Fields{"pkg": "kuberbs-", "resourceType": resourceType, "newEvent.key": newEvent.key}).Debug("Processing update")
 				if err == nil {
 					queue.Add(newEvent)
 				}
@@ -145,7 +145,7 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 	}
 
 	return &Controller{
-		logger:    logrus.WithField("pkg", "kuberbs-"+resourceType),
+		logger:    logrus.WithFields(logrus.Fields{"service": "kuberbs", "pkg": "controler"}),
 		client:    client,
 		informer:  informer,
 		queue:     queue,
@@ -229,11 +229,9 @@ func (c *Controller) processItem(newEvent Event) error {
 			if (dp.Name == newEvent.old.Name) && (dp.NameSpace == newEvent.old.Namespace) {
 				isNewDeployment = false
 				break
-
 			}
-
 		}
-		logrus.Debugf("%s is new deployment %v ", newEvent.old.Name, isNewDeployment)
+		c.logger.Debugf("%s is a new deployment %v ", newEvent.old.Name, isNewDeployment)
 		status := false
 		rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
 		if err != nil {
@@ -249,7 +247,6 @@ func (c *Controller) processItem(newEvent Event) error {
 						threshold = dp.Deployment.Threshold
 						watchPeriod = rbs.Items[0].Spec.WatchPeriod
 						continue
-
 					}
 				}
 			}
@@ -258,20 +255,22 @@ func (c *Controller) processItem(newEvent Event) error {
 			if status {
 				newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
 				deploymentWatchList.PushBack(newDeployment)
-				logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Got a state change")
+				c.logger.WithFields(logrus.Fields{"namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Got a deployment state change")
 			}
 			return nil
 		}
 		if !dp.DeploymentComplete(newEvent.new) {
-			logrus.Debugf("Deployment still in progress %s", dp.Name)
+			c.logger.Debugf("Deployment still in progress %s", dp.Name)
 			return nil
 		}
 		if !dp.ShouldWatch() {
 			// No change in containers version
+			c.logger.Debugf("No change in %s deployment", dp.Name)
 			deployment.RemoveFromDeploymentWatchList(dp)
 			return nil
 		}
 		if dp.IsRollback {
+			c.logger.Debugf("Rollback for is active %s", dp.Name)
 			return nil
 		}
 		dp.IsObservedGenerationSame()
@@ -282,7 +281,7 @@ func (c *Controller) processItem(newEvent Event) error {
 			deploymentWatchList.PushBack(dp)
 			err = dp.SaveCurrentDeploymentState()
 			if err != nil {
-				logrus.Error(err)
+				c.logger.Error(err)
 				return nil
 			}
 		} else {
@@ -291,7 +290,7 @@ func (c *Controller) processItem(newEvent Event) error {
 			}
 			err = dp.SaveCurrentDeploymentState()
 			if err != nil {
-				logrus.Error(err)
+				c.logger.Error(err)
 				return nil
 			}
 		}
@@ -320,7 +319,7 @@ func (c *Controller) loadDeployments() {
 		for _, d := range rbs.Items[0].Spec.Namespaces[i].Deployments {
 			dp, err := c.client.AppsV1().Deployments(ns.Name).Get(d.Deployment.Name, meta_v1.GetOptions{})
 			if err != nil {
-				logrus.Error(err)
+				c.logger.Error(err)
 				continue
 			}
 			if meta_v1.HasAnnotation(dp.ObjectMeta, "kuberbs.starttime") {
@@ -328,13 +327,13 @@ func (c *Controller) loadDeployments() {
 				if tstr != "" {
 					t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", tstr)
 					if err != nil {
-						logrus.Error(err)
+						c.logger.Error(err)
 						continue
 					}
 					t = t.Add(time.Duration(watchPeriod) * time.Minute)
 					if time.Now().Before(t) {
 
-						logrus.WithFields(logrus.Fields{"pkg": "kuberbs", "namesapce": dp.Namespace, "name": dp.Name}).Info("Found a un finished watch task!")
+						c.logger.WithFields(logrus.Fields{"namesapce": dp.Namespace, "name": dp.Name}).Info("Found a un finished watch task!")
 						metricName = d.Deployment.Metric
 						threshold := d.Deployment.Threshold
 						old := c.createOldDeployment(dp)
