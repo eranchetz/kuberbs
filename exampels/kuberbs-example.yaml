@@ -20,4 +20,3 @@ spec:
     - deployment:
         name: kube-dns
         metric: logging.googleapis.com/user/dig
-

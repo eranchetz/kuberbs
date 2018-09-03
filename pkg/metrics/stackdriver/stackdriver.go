@@ -72,11 +72,17 @@ func (sd *Stackdriver) Start() {
 			}
 		case <-timeChan:
 			sd.logger.Debug("Timer expired. We are done!")
-			sd.doneHandler(true)
+			err := sd.doneHandler(true)
+			if err != nil {
+				sd.logger.Error(err)
+			}
 			return
 		case remove := <-sd.doneChan:
 			sd.logger.Debug("Stop called. We are done!")
-			sd.doneHandler(remove)
+			err := sd.doneHandler(remove)
+			if err != nil {
+				sd.logger.Error(err)
+			}
 			return
 		}
 	}
@@ -116,9 +122,7 @@ func readTimeSeriesValue(s *monitoring.Service, metricType string, startat time.
 	projectID, err := utils.ProjectName()
 	if err != nil {
 		logrus.Error(err)
-		//return 0, err
-		//TODO REMOVE
-		projectID = "aviv-playground"
+		return 0, err
 	}
 	logrus.Debugf("readTimeSeriesValue for %s", metricType)
 	startTime := time.Now().UTC().Add(time.Until(startat))

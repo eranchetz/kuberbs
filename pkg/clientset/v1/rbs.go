@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-//TODO default for local kube-system for remote
+// default for local kube-system for remote
 const RbsNameSpace = "kube-system"
 
 type RbsInterface interface {

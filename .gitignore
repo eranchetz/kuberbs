@@ -15,3 +15,4 @@ key.json
 kuberbs
 token
 ca.crt
+/vendor/

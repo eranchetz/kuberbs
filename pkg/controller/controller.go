@@ -219,8 +219,8 @@ func (c *Controller) processNextItem() bool {
 func (c *Controller) processItem(newEvent Event) error {
 	switch newEvent.eventType {
 	case "update":
-		deploymentWatchList := deployment.GetDeploymentWatchList()
 		var err error
+		deploymentWatchList := deployment.GetDeploymentWatchList()
 		status, metricName, threshold := c.getDataFromRbs(newEvent)
 		if !status {
 			return nil
@@ -246,7 +246,6 @@ func (c *Controller) processItem(newEvent Event) error {
 			return nil
 		}
 		if !dp.DeploymentComplete(newEvent.new) {
-
 			c.logger.Debugf("Deployment still in progress %s", dp.Name)
 			return nil
 		}

@@ -29,8 +29,7 @@ var version string
 var buildDate string
 
 func main() {
-	//TODO Change to Info
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 	formatter := &logrus.TextFormatter{
 		FullTimestamp: true,
 	}
