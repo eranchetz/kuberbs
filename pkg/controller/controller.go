@@ -21,6 +21,7 @@
 package controller
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"os/signal"
@@ -64,11 +65,13 @@ type Event struct {
 
 // Controller object
 type Controller struct {
-	logger    *logrus.Entry
-	client    kubernetes.Interface
-	clinetSet *client_v1.V1Client
-	queue     workqueue.RateLimitingInterface
-	informer  cache.SharedIndexInformer
+	logger        *logrus.Entry
+	client        kubernetes.Interface
+	clinetSet     *client_v1.V1Client
+	queue         workqueue.RateLimitingInterface
+	informer      cache.SharedIndexInformer
+	metricsSource string
+	watchPeriod   int
 }
 
 // Start - starts the controller
@@ -214,52 +217,36 @@ func (c *Controller) processNextItem() bool {
 }
 
 func (c *Controller) processItem(newEvent Event) error {
-	var metricsSource, metricName string
-	threshold := 0
-	watchPeriod := 0
 	switch newEvent.eventType {
 	case "update":
-
 		deploymentWatchList := deployment.GetDeploymentWatchList()
-		// Is this a new one?
-		isNewDeployment := true
-		var dp *deployment.Deployment
-		for e := deploymentWatchList.Front(); e != nil; e = e.Next() {
-			dp = e.Value.(*deployment.Deployment)
-			if (dp.Name == newEvent.old.Name) && (dp.NameSpace == newEvent.old.Namespace) {
-				isNewDeployment = false
-				break
-			}
+		var err error
+		status, metricName, threshold := c.getDataFromRbs(newEvent)
+		if !status {
+			return nil
 		}
-		c.logger.Debugf("%s is a new deployment %v ", newEvent.old.Name, isNewDeployment)
-		status := false
-		rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
-		if err != nil {
-			panic(err)
+		isNewDp, dp := c.isNewDeployment(newEvent, deploymentWatchList)
+		if isNewDp {
+			newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
+			deploymentWatchList.PushBack(newDeployment)
+			c.logger.WithFields(logrus.Fields{"namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Got a deployment state change")
+			return nil
 		}
-		for i, ns := range rbs.Items[0].Spec.Namespaces {
-			if strings.EqualFold(ns.Name, newEvent.old.ObjectMeta.Namespace) {
-				for _, dp := range rbs.Items[0].Spec.Namespaces[i].Deployments {
-					if strings.EqualFold(dp.Deployment.Name, newEvent.old.ObjectMeta.Name) {
-						status = true
-						metricsSource = strings.ToLower(rbs.Items[0].Spec.MetricsSource)
-						metricName = dp.Deployment.Metric
-						threshold = dp.Deployment.Threshold
-						watchPeriod = rbs.Items[0].Spec.WatchPeriod
-						continue
-					}
-				}
-			}
-		}
-		if isNewDeployment {
-			if status {
-				newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
+		if dp.Watching {
+			newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
+			if newDeployment.ShouldWatch() {
+				dp.StopWatch(false)
+				deployment.RemoveFromDeploymentWatchList(dp)
 				deploymentWatchList.PushBack(newDeployment)
-				c.logger.WithFields(logrus.Fields{"namespace": newEvent.old.ObjectMeta.Namespace, "name": newEvent.old.ObjectMeta.Name}).Info("Got a deployment state change")
+				return nil
 			}
+		}
+		if dp.IsRollback {
+			c.logger.Debugf("Rollback for %s is active", dp.Name)
 			return nil
 		}
 		if !dp.DeploymentComplete(newEvent.new) {
+
 			c.logger.Debugf("Deployment still in progress %s", dp.Name)
 			return nil
 		}
@@ -269,34 +256,18 @@ func (c *Controller) processItem(newEvent Event) error {
 			deployment.RemoveFromDeploymentWatchList(dp)
 			return nil
 		}
-		if dp.IsRollback {
-			c.logger.Debugf("Rollback for is active %s", dp.Name)
+		if !dp.IsObservedGenerationSame() {
 			return nil
 		}
-		dp.IsObservedGenerationSame()
-		et := time.Now().Add(time.Duration(watchPeriod) * time.Minute)
-		if (dp.Watching) && (utils.ShouldWatch(newEvent.old, newEvent.new)) {
-			dp.StopWatch(true)
-			dp = deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
-			deploymentWatchList.PushBack(dp)
-			err = dp.SaveCurrentDeploymentState()
-			if err != nil {
-				c.logger.Error(err)
-				return nil
-			}
-		} else {
-			if !dp.IsObservedGenerationSame() {
-				return nil
-			}
-			err = dp.SaveCurrentDeploymentState()
-			if err != nil {
-				c.logger.Error(err)
-				return nil
-			}
+		c.logger.Debugf("Saving deployment %s", dp.Name)
+		err = dp.SaveCurrentDeploymentState()
+		if err != nil {
+			c.logger.Error(err)
+			return nil
 		}
-		m := setWatcher(metricsSource, metricName, et, dp)
+		et := time.Now().Add(time.Duration(c.watchPeriod) * time.Minute)
+		m := setWatcher(c.metricsSource, metricName, et, dp)
 		go dp.StartWatch(*m)
-
 		return nil
 
 	case "create":
@@ -307,14 +278,28 @@ func (c *Controller) processItem(newEvent Event) error {
 	return nil
 }
 
+func (c *Controller) isNewDeployment(newEvent Event, deploymentWatchList *list.List) (bool, *deployment.Deployment) {
+	isNewDeployment := true
+	var dp *deployment.Deployment
+	for e := deploymentWatchList.Front(); e != nil; e = e.Next() {
+		dp = e.Value.(*deployment.Deployment)
+		if strings.EqualFold(dp.Name, newEvent.old.Name) && strings.EqualFold(dp.NameSpace, newEvent.old.Namespace) {
+			isNewDeployment = false
+			break
+		}
+	}
+	c.logger.Debugf("%s is a new deployment %v", newEvent.old.Name, isNewDeployment)
+	return isNewDeployment, dp
+}
+
 func (c *Controller) loadDeployments() {
-	var metricsSource, metricName string
+	var metricName string
 	rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
-	watchPeriod := rbs.Items[0].Spec.WatchPeriod
-	metricsSource = strings.ToLower(rbs.Items[0].Spec.MetricsSource)
+	c.watchPeriod = rbs.Items[0].Spec.WatchPeriod
+	c.metricsSource = strings.ToLower(rbs.Items[0].Spec.MetricsSource)
 	for i, ns := range rbs.Items[0].Spec.Namespaces {
 		for _, d := range rbs.Items[0].Spec.Namespaces[i].Deployments {
 			dp, err := c.client.AppsV1().Deployments(ns.Name).Get(d.Deployment.Name, meta_v1.GetOptions{})
@@ -330,7 +315,7 @@ func (c *Controller) loadDeployments() {
 						c.logger.Error(err)
 						continue
 					}
-					t = t.Add(time.Duration(watchPeriod) * time.Minute)
+					t = t.Add(time.Duration(c.watchPeriod) * time.Minute)
 					if time.Now().Before(t) {
 
 						c.logger.WithFields(logrus.Fields{"namesapce": dp.Namespace, "name": dp.Name}).Info("Found a un finished watch task!")
@@ -338,7 +323,7 @@ func (c *Controller) loadDeployments() {
 						threshold := d.Deployment.Threshold
 						old := c.createOldDeployment(dp)
 						newDeployment := deployment.NewDeploymentController(c.client, old, dp, threshold)
-						m := setWatcher(metricsSource, metricName, t, newDeployment)
+						m := setWatcher(c.metricsSource, metricName, t, newDeployment)
 						deploymentWatchList := deployment.GetDeploymentWatchList()
 						deploymentWatchList.PushBack(newDeployment)
 						go newDeployment.StartWatch(*m)
@@ -361,6 +346,30 @@ func (c *Controller) createOldDeployment(current *apps_v1.Deployment) *apps_v1.D
 		}
 	}
 	return old
+}
+
+func (c *Controller) getDataFromRbs(newEvent Event) (bool, string, int) {
+	status := false
+	var metricName string
+	var threshold int
+
+	rbs, err := c.clinetSet.Rbs(client_v1.RbsNameSpace).List(meta_v1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	for i, ns := range rbs.Items[0].Spec.Namespaces {
+		if strings.EqualFold(ns.Name, newEvent.old.ObjectMeta.Namespace) {
+			for _, dp := range rbs.Items[0].Spec.Namespaces[i].Deployments {
+				if strings.EqualFold(dp.Deployment.Name, newEvent.old.ObjectMeta.Name) {
+					status = true
+					metricName = dp.Deployment.Metric
+					threshold = dp.Deployment.Threshold
+					continue
+				}
+			}
+		}
+	}
+	return status, metricName, threshold
 }
 
 func setWatcher(metricsSource string, metricName string, et time.Time, newDeployment *deployment.Deployment) *metrics.Metrics {
