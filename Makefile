@@ -16,7 +16,7 @@ default: build test
 build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
-    builder-image:
+builder-image:
 	@docker build -t "${BUILDER}" --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE}  -f Dockerfile.build .
 
 binary-image: builder-image
