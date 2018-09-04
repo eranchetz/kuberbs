@@ -29,7 +29,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/derekparker/delve/pkg/config"
 	"github.com/doitintl/kuberbs/pkg/api/types/v1"
 	client_v1 "github.com/doitintl/kuberbs/pkg/clientset/v1"
@@ -37,6 +36,7 @@ import (
 	"github.com/doitintl/kuberbs/pkg/metrics"
 	st "github.com/doitintl/kuberbs/pkg/metrics/stackdriver"
 	"github.com/doitintl/kuberbs/pkg/utils"
+	"github.com/sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -235,6 +235,7 @@ func (c *Controller) processItem(newEvent Event) error {
 		if dp.Watching {
 			newDeployment := deployment.NewDeploymentController(c.client, newEvent.old, newEvent.new, threshold)
 			if newDeployment.ShouldWatch() {
+				c.logger.Infof("Stopping watch for %s in %s", dp.Name, dp.NameSpace)
 				dp.StopWatch(false)
 				deployment.RemoveFromDeploymentWatchList(dp)
 				deploymentWatchList.PushBack(newDeployment)
@@ -261,7 +262,7 @@ func (c *Controller) processItem(newEvent Event) error {
 		c.logger.Debugf("Saving deployment %s", dp.Name)
 		err = dp.SaveCurrentDeploymentState()
 		if err != nil {
-			c.logger.Error(err)
+			c.logger.Debugf("Will retry %s", err.Error())
 			return nil
 		}
 		et := time.Now().Add(time.Duration(c.watchPeriod) * time.Minute)
