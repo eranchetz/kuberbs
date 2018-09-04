@@ -2,7 +2,7 @@
 
 K8 deployment automatic rollback system
 
-
+[![License](https://img.shields.io/github/license/doitintl/kuberbs.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/doitintl/kuberbs.svg?style=social&label=Stars&style=for-the-badge)](https://github.com/doitintl/kuberbs) [![Build Status](https://secure.travis-ci.org/doitintl/kuberbs.png?branch=master)](http://travis-ci.org/doitintl/kuberbs)
 # Deploy kuberbs (without building from source)
 
 If you just want to use KubeRBS (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
