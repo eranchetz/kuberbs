@@ -21,7 +21,7 @@
 #
 # [prune]
 #   non-go = false
-#   go-tests = true
+#   go-testing-app = true
 #   unused-packages = true
 
 

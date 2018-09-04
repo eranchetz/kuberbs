@@ -200,6 +200,14 @@
   version = "v0.3.6"
 
 [[projects]]
+  branch = "master"
+  digest = "1:67af90f6f6551eed6e14b16833c68ff9e6a3d1e11ea296df70693b24744c24d1"
+  name = "github.com/joonix/log"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d2d3f2f4a80658c67a0bc44021dcac30f3017c06"
+
+[[projects]]
   digest = "1:b1d4df033414c1a0d85fa7037b9aaf03746314811c860a95ea2d5fd481cd6c35"
   name = "github.com/json-iterator/go"
   packages = ["."]
@@ -258,6 +266,14 @@
   pruneopts = "UT"
   revision = "5f041e8faa004a95c88a202771f4cc3e991971e6"
   version = "v2.0.1"
+
+[[projects]]
+  digest = "1:d867dfa6751c8d7a435821ad3b736310c2ed68945d05b50fb9d23aee0540c8cc"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
+  version = "v1.0.6"
 
 [[projects]]
   digest = "1:9424f440bba8f7508b69414634aef3b2b3a877e522d8a4624692412805407bb7"
@@ -542,6 +558,8 @@
   input-imports = [
     "github.com/Sirupsen/logrus",
     "github.com/derekparker/delve/pkg/config",
+    "github.com/joonix/log",
+    "github.com/sirupsen/logrus",
     "golang.org/x/net/context",
     "golang.org/x/oauth2/google",
     "google.golang.org/api/monitoring/v3",

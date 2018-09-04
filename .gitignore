@@ -16,3 +16,4 @@ kuberbs
 token
 ca.crt
 /vendor/
+hello-kubernetes
