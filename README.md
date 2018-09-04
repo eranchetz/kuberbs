@@ -1,15 +1,213 @@
-# kuberbs - Work In Progress
-K8 deployment rollback system
+# kuberbs 
 
-## Assumptions
-Supported Strategy - RollingUpdate
-Deployment is done with record
-Image url changed
-
-### TDOO
-* Partial deployments with different name
-* Istio 
+K8 deployment automatic rollback system
 
 
+# Deploy kuberbs (without building from source)
 
-https://container-solutions.com/kubernetes-deployment-strategies/
+If you just want to use KubeRBS (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+
+Configure gcloud sdk by setting your default project:
+
+```
+gcloud config set project {your project_id}
+```
+
+Set the environment variables: 
+ 
+```
+export GCP_REGION=us-central1
+export GKE_CLUSTER_NAME=kuberbs-cluster
+export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
+```
+
+**Create IAM Service Account and obtain the Key in JSON format**
+
+Create Service Account with this command: 
+
+```
+gcloud iam service-accounts create kuberbs-service-account --display-name "kuberbs"
+```
+
+Create and attach custom kuberbs role to the service account by running the following commands:
+
+```
+gcloud iam roles create kuberbs --project $PROJECT_ID --file roles.yaml
+
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kuberbs-service-account@$PROJECT_ID.iam.gserviceaccount.com --role projects/$PROJECT_ID/roles/kuberbs
+```
+
+Generate the Key using the following command:
+
+```
+gcloud iam service-accounts keys create key.json \
+--iam-account kuberbs-service-account@$PROJECT_ID.iam.gserviceaccount.com
+```
+ 
+**Create Kubernetes Secret**
+
+Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
+
+gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
+--region $GCP_REGION \
+--project $PROJECT_ID
+ 
+
+Create a Kubernetes secret by running:
+
+```
+kubectl create secret generic kuberbs-key --from-file=key.json
+```
+
+**Deploy Kuberbs**
+
+```
+kubectl apply -f deploy/.
+```
+
+**Create Cobfiguration file**
+
+Change the example in `exampels\kuberbs-example.yaml` to fit your needs
+
+Here are the configuration options
+
+  `watchperiod`  int - for how long to wtach a deployment
+  
+  `metricssource`  string - curntly we only support stackdriver
+  
+  for each namespace that you would like to watch you can have mutiple deployments.
+  Each deployments must have a name, a metric and the threshold per second.
+
+Deploy your configuration file.
+
+
+#  Deploy & Build From Source
+
+
+You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+
+
+**Clone Git Repository**
+
+Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
+
+```
+git clone https://github.com/doitintl/kuberbs.git $GOPATH/src/kuberbs
+cd $GOPATH/src/kuberbs 
+```
+
+**Set Environment Variables**
+
+Replace **us-central1** with the region where your GKE cluster resides and **kuberbs-cluster** with your real GKE cluster name
+
+```
+export GCP_REGION=us-central1
+export GKE_CLUSTER_NAME=kuberbs-cluster
+export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
+```
+
+**Build kubeRBS's container image**
+
+Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
+
+```
+dep ensure
+```
+
+Compile the kuberbs by running: 
+
+```
+make builder-image
+```
+
+Build the Docker image with compiled version of kuberbs as following:
+
+```
+make binary-image
+```
+
+Tag the image using: 
+
+```
+docker tag kuberbs gcr.io/$PROJECT_ID/kuberbs
+```
+
+Finally, push the image to Google Container Registry with: 
+
+```
+docker push gcr.io/$PROJECT_ID/kuberbs
+```
+
+**Create IAM Service Account and obtain the Key in JSON format**
+
+Create Service Account with this command: 
+
+```
+gcloud iam service-accounts create kuberbs-service-account --display-name "kuberbs"
+```
+
+Create and attach custom kuberbs role to the service account by running the following commands:
+
+```
+gcloud iam roles create kuberbs --project $PROJECT_ID --file roles.yaml
+
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kuberbs-service-account@$PROJECT_ID.iam.gserviceaccount.com --role projects/$PROJECT_ID/roles/kuberbs
+```
+
+Generate the Key using the following command:
+
+```
+gcloud iam service-accounts keys create key.json \
+--iam-account kuberbs-service-account@$PROJECT_ID.iam.gserviceaccount.com
+```
+ 
+**Create Kubernetes Secret**
+
+Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
+
+gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
+--region $GCP_REGION \
+--project $PROJECT_ID
+ 
+
+Create a Kubernetes secret by running:
+
+```
+kubectl create secret generic kuberbs-key --from-file=key.json
+```
+
+Deploy kuberbs by running
+
+kubectl apply -f deploy/.
+
+**Running kuberbs localy**
+
+Make sure you can access your cluster
+
+`APISERVER=$(kubectl config view --minify | grep server | cut -f 2- -d ":" | tr -d " ")`
+
+`TOKEN=$(kubectl describe secret $(kubectl get secrets | grep ^default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d " ")`
+
+`curl $APISERVER/api --header "Authorization: Bearer $TOKEN" --insecure`
+
+If you can access your cluster then you need to set up the credtials:
+
+`echo $TOKEN >token`
+`tr -d '\n' <token >t`
+`sudo cp t /var/run/secrets/kubernetes.io/serviceaccount/token`
+ssh into one of the contatnesr in your cluster and get `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`. copy that file to your local `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`
+
+In the file `pkg/clinetset/v1/rbs` 
+replace `const RbsNameSpace = "kube-system"` with `const RbsNameSpace = "default"` 
+
+References:
+
+Event listening code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)
+
+
+
+
+
+
+
+
