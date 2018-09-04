@@ -21,8 +21,8 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
 	c "github.com/doitintl/kuberbs/pkg/client"
+	"github.com/sirupsen/logrus"
 )
 
 var version string

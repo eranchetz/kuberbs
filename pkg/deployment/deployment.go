@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/doitintl/kuberbs/pkg/metrics"
 	"github.com/doitintl/kuberbs/pkg/utils"
 	apps_v1 "k8s.io/api/apps/v1"

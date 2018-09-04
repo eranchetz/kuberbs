@@ -29,7 +29,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/derekparker/delve/pkg/config"
 	"github.com/doitintl/kuberbs/pkg/api/types/v1"
 	client_v1 "github.com/doitintl/kuberbs/pkg/clientset/v1"
