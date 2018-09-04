@@ -1,0 +1,10 @@
+title: "kuberbs"
+description: "required permissions to run Kuberbs"
+stage: "GA"
+includedPermissions:
+- compute.projects.get
+- container.clusters.get
+- container.clusters.list
+- resourcemanager.projects.get
+- monitoring.timeSeries.list
+- projects.timeSeries.list
