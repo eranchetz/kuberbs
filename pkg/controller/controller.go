@@ -33,8 +33,8 @@ import (
 	"github.com/doitintl/kuberbs/pkg/api/types/v1"
 	client_v1 "github.com/doitintl/kuberbs/pkg/clientset/v1"
 	"github.com/doitintl/kuberbs/pkg/deployment"
-	"github.com/doitintl/kuberbs/pkg/metrics"
-	st "github.com/doitintl/kuberbs/pkg/metrics/stackdriver"
+	"github.com/doitintl/kuberbs/pkg/metrics/metricsservice"
+	"github.com/doitintl/kuberbs/pkg/metrics/stackdriver"
 	"github.com/doitintl/kuberbs/pkg/utils"
 	"github.com/sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
@@ -372,13 +372,13 @@ func (c *Controller) getDataFromRbs(newEvent Event) (bool, string, int) {
 	return status, metricName, threshold
 }
 
-func setWatcher(metricsSource string, metricName string, et time.Time, newDeployment *deployment.Deployment) *metrics.Metrics {
-	var m metrics.Metrics
+func setWatcher(metricsSource string, metricName string, et time.Time, newDeployment *deployment.Deployment) *metricsservice.MetricsSevrice {
+	m := *metricsservice.NewMetricsSevrice(time.Now(), et, metricName)
+	m.SetMetricsHandler(newDeployment.MetricsHandler)
+	m.SetDoneHandler(newDeployment.WatchDoneHandler)
 	switch metricsSource {
 	case "stackdriver":
-		m = st.NewStackDriver(time.Now(), et, metricName)
-		m.SetMetricsHandler(newDeployment.MetricsHandler)
-		m.SetDoneHandler(newDeployment.WatchDoneHandler)
+		m.SetCheckMetricsFunc(stackdriver.CheckMetrics)
 		return &m
 	default:
 		return &m

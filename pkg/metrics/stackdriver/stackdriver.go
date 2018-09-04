@@ -21,100 +21,26 @@
 package stackdriver
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"github.com/doitintl/kuberbs/pkg/metrics"
 	"github.com/doitintl/kuberbs/pkg/utils"
-	"golang.org/x/net/context"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/monitoring/v3"
+	monitoring "google.golang.org/api/monitoring/v3"
 )
 
-// Stackdriver - Holds data about the stackdriver watcher
-type Stackdriver struct {
-	StartAt        time.Time
-	EndAt          time.Time
-	logger         *logrus.Entry
-	MetricName     string
-	metricsHandler metrics.ErrorRateHandler
-	doneHandler    metrics.DoneHandler
-	doneChan       chan bool
-}
-
-// NewStackDriver - create new stackdriver struct
-func NewStackDriver(startat time.Time, endat time.Time, metricname string) *Stackdriver {
-	return &Stackdriver{
-		StartAt:    startat,
-		EndAt:      endat,
-		MetricName: metricname,
-		logger:     logrus.WithFields(logrus.Fields{"service": "kuberbs", "pkg": "stackdriver"}),
-	}
-}
-
-// Start - start watching
-func (sd *Stackdriver) Start() {
-	sd.logger.Info("Starting Stackdriver Run")
-	delta := time.Until(sd.EndAt)
-	sd.doneChan = make(chan bool)
-	timeChan := time.NewTimer(delta).C
-	tickChan := time.NewTicker(time.Second * metrics.CheckMetricsInterval).C
-	for {
-		select {
-		case <-tickChan:
-			logrus.Debug("Tick Called")
-			rate, err := sd.checkMetrics()
-			if err != nil {
-				sd.logger.Fatal(err)
-			} else {
-				sd.metricsHandler(rate)
-			}
-		case <-timeChan:
-			sd.logger.Debug("Timer expired. We are done!")
-			err := sd.doneHandler(true)
-			if err != nil {
-				sd.logger.Error(err)
-			}
-			return
-		case remove := <-sd.doneChan:
-			sd.logger.Debug("Stop called. We are done!")
-			err := sd.doneHandler(remove)
-			if err != nil {
-				sd.logger.Error(err)
-			}
-			return
-		}
-	}
-
-}
-
-// Stop - kill the watch time and stop watching
-func (sd *Stackdriver) Stop(remove bool) {
-	sd.doneChan <- remove
-}
-
 // checkMetrics - connect to stackdriver and call readTimeSeriesValue
-func (sd *Stackdriver) checkMetrics() (float64, error) {
+func CheckMetrics(MetricName string, startat time.Time) (float64, error) {
 	ctx := context.Background()
 	s, err := createService(ctx)
 	if err != nil {
-		sd.logger.Fatal(err)
+		logrus.Fatal(err)
 		return 0, err
 	}
-	metricType := sd.MetricName
-	return readTimeSeriesValue(s, metricType, sd.StartAt)
-
-}
-
-// SetMetricsHandler - set call back after reading the metrics
-func (sd *Stackdriver) SetMetricsHandler(erh metrics.ErrorRateHandler) {
-	sd.metricsHandler = erh
-}
-
-// SetDoneHandler - set the callback handler when watcher is done
-func (sd *Stackdriver) SetDoneHandler(dh metrics.DoneHandler) {
-	sd.doneHandler = dh
+	metricType := MetricName
+	return readTimeSeriesValue(s, metricType, startat)
 
 }
 

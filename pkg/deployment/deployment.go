@@ -25,9 +25,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"github.com/doitintl/kuberbs/pkg/metrics"
+	"github.com/doitintl/kuberbs/pkg/metrics/metricsservice"
 	"github.com/doitintl/kuberbs/pkg/utils"
+	"github.com/sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,7 +42,7 @@ type Deployment struct {
 	NameSpace  string
 	logger     *logrus.Entry
 	Threshold  int
-	metrics    metrics.Metrics
+	metrics    metricsservice.MetricsSevrice
 	Watching   bool
 	IsRollback bool
 	client     kubernetes.Interface
@@ -93,7 +93,7 @@ func (d *Deployment) SaveCurrentDeploymentState() error {
 }
 
 // StartWatch - start the metrcis watcher
-func (d *Deployment) StartWatch(m metrics.Metrics) {
+func (d *Deployment) StartWatch(m metricsservice.MetricsSevrice) {
 	d.logger.Debug("Starting to Watch! Calling m.Run")
 	d.Watching = true
 	d.metrics = m
