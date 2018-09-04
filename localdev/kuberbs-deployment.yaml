@@ -17,6 +17,7 @@ spec:
         serviceAccountName: default
         containers:
         - name: "kuberbs"
+          #Replace it with your own image
           image: doitintl/kuberbs:latest
           # only for dev
           imagePullPolicy: Always
