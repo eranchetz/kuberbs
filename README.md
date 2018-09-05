@@ -67,7 +67,7 @@ kubectl apply -f deploy/.
 
 **Create Cobfiguration file**
 
-Change the example in `exampels\kuberbs-example.yaml` to fit your needs
+Change the example in `examples\kuberbs-example.yaml` to fit your needs
 
 Here are the configuration options
 
@@ -202,12 +202,4 @@ replace `const RbsNameSpace = "kube-system"` with `const RbsNameSpace = "default
 
 References:
 
-Event listening code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)
-
-
-
-
-
-
-
-
+Event listening code was taken from [kubewatch](https://github.com/bitnami-labs/kubewatch/)

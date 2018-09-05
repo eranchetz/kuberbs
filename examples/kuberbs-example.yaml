@@ -1,0 +1,22 @@
+apiVersion: "doit-intl.com/v1"
+kind: Rbs
+metadata:
+    name: my-rbs-example
+spec:
+  watchperiod: 5
+  metricssource: stackdriver
+  namespaces:
+  - name: default
+    deployments:
+    - deployment:
+        name: hello-kubernetes
+        metric: logging.googleapis.com/user/hello-kubernetes
+        threshold: 1
+    - deployment:
+        name: foo
+        metric: logging.googleapis.com/user/bar
+  - name: kube-system
+    deployments:
+    - deployment:
+        name: kube-dns
+        metric: logging.googleapis.com/user/dig
