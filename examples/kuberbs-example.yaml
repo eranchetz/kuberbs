@@ -9,15 +9,15 @@ spec:
   - name: default
     deployments:
     - deployment:
-        name: hello-kubernetes
+        name: hello-kubernetes-app
         #Stack driver metric
-        metric: logging.googleapis.com/user/hello-kubernetes
-        # DataDog metric
-        # metric: gcp.container.cpu.usage_time{*}
+        metric: logging.googleapis.com/user/hello-kubernetes-app-errors
         threshold: 1
     - deployment:
-        name: foo
-        metric: logging.googleapis.com/user/bar
+        name: kubernetes-app-2
+        # DataDog metric
+        metric: gcp.container.cpu.usage_time{*}
+        threshold: 85
   - name: kube-system
     deployments:
     - deployment:

@@ -65,7 +65,7 @@ kubectl create secret generic kuberbs-key --from-file=key.json
 kubectl apply -f deploy/.
 ```
 
-**Create Cobfiguration file**
+**Create Configuration file**
 
 Change the example in `examples\kuberbs-example.yaml` to fit your needs
 
