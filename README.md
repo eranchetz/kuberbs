@@ -73,7 +73,7 @@ Here are the configuration options
 
   `watchperiod`  int - for how long to wtach a deployment
   
-  `metricssource`  string - curntly we only support stackdriver
+  `metricssource`  string - currently we  support stackdriver and datadog
   
   for each namespace that you would like to watch you can have mutiple deployments.
   Each deployments must have a name, a metric and the threshold per second.
