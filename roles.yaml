@@ -7,4 +7,3 @@ includedPermissions:
 - container.clusters.list
 - resourcemanager.projects.get
 - monitoring.timeSeries.list
-- projects.timeSeries.list
