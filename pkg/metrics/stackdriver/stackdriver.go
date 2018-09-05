@@ -32,7 +32,7 @@ import (
 )
 
 // checkMetrics - connect to stackdriver and call readTimeSeriesValue
-func CheckMetrics(MetricName string, startat time.Time) (float64, error) {
+func CheckMetrics(MetricName string, startat time.Time, apiKey string, appKey string) (float64, error) {
 	ctx := context.Background()
 	s, err := createService(ctx)
 	if err != nil {
