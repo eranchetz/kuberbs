@@ -22,28 +22,30 @@ spec:
           - name: google-cloud-key
             mountPath: /var/secrets/google
           env:
+          - name: "KUBERBS_CHECKMETRICSINTERVAL"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBERBS_CHECKMETRICSINTERVAL"
+                name: "kuberbs-config"
+          - name: "KUBERBS_APIKEY"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBERBS_APIKEY"
+                name: "kuberbs-config"
+          - name: "KUBERBS_APPKEY"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBERBS_APPKEY"
+                name: "kuberbs-config"
+          - name: "KUBERBS_DEBUG"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBERBS_DEBUG"
+                name: "kuberbs-config"
+
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /var/secrets/google/key.json
-            - name: "KUBERBS_CHECKMETRICSINTERVAL"
-              valueFrom:
-                configMapKeyRef:
-                  key: "KUBERBS_CHECKMETRICSINTERVAL"
-                  name: "kuberbs-config"
-            - name: "KUBERBS_APIKEY"
-              valueFrom:
-                configMapKeyRef:
-                  key: "KUBERBS_APIKEY"
-                  name: "kuberbs-config"
-            - name: "KUBERBS_APPKEY"
-              valueFrom:
-                configMapKeyRef:
-                  key: "KUBERBS_APPKEY"
-                  name: "kuberbs-config"
-            - name: "KUBERBS_DEBUG"
-              valueFrom:
-                configMapKeyRef:
-                  key: "KUBERBS_DEBUG"
-                  name: "kuberbs-config"
+
         restartPolicy: Always
         volumes:
           - name: google-cloud-key
