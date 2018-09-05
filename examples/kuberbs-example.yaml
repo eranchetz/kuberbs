@@ -10,7 +10,10 @@ spec:
     deployments:
     - deployment:
         name: hello-kubernetes
+        #Stack driver metric
         metric: logging.googleapis.com/user/hello-kubernetes
+        # DataDog metric
+        # metric: gcp.container.cpu.usage_time{*}
         threshold: 1
     - deployment:
         name: foo
