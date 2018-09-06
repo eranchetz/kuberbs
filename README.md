@@ -56,7 +56,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kuberbs-key --from-file=key.json
+kubectl create secret generic kuberbs-key --from-file=key.json --namespace=kube-system
 ```
 
 **Deploy Kuberbs**
@@ -173,7 +173,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kuberbs-key --from-file=key.json
+kubectl create secret generic kuberbs-key --from-file=key.json --namespace=kube-system
 ```
 
 Deploy kuberbs by running
