@@ -5,7 +5,13 @@ K8 deployment automatic rollback system
 [![License](https://img.shields.io/github/license/doitintl/kuberbs.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/doitintl/kuberbs.svg?style=social&label=Stars&style=for-the-badge)](https://github.com/doitintl/kuberbs) [![Build Status](https://secure.travis-ci.org/doitintl/kuberbs.png?branch=master)](http://travis-ci.org/doitintl/kuberbs)
 # Deploy kuberbs (without building from source)
 
-If you just want to use KubeRBS (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+If you just want to use KubeRBS (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster.
+You can install Kuberbs on any Kubernetes cluster either on perm or in the cloud.
+Kuberbs supports metrcis from DataDog or Stackdriver
+
+## GKE Specfifc Setup  
+You'll also need the Google Cloud SDK.
+You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
 Configure gcloud sdk by setting your default project:
 
@@ -52,7 +58,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 --region $GCP_REGION \
 --project $PROJECT_ID
  
-
+## None GKE Specfifc Setup 
 Create a Kubernetes secret by running:
 
 ```
@@ -96,16 +102,6 @@ git clone https://github.com/doitintl/kuberbs.git $GOPATH/src/kuberbs
 cd $GOPATH/src/kuberbs 
 ```
 
-**Set Environment Variables**
-
-Replace **us-central1** with the region where your GKE cluster resides and **kuberbs-cluster** with your real GKE cluster name
-
-```
-export GCP_REGION=us-central1
-export GKE_CLUSTER_NAME=kuberbs-cluster
-export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
-```
-
 **Build kubeRBS's container image**
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
@@ -132,10 +128,22 @@ Tag the image using:
 docker tag kuberbs gcr.io/$PROJECT_ID/kuberbs
 ```
 
-Finally, push the image to Google Container Registry with: 
+Finally, push the image to  Container Registry with: 
 
+For example
 ```
 docker push gcr.io/$PROJECT_ID/kuberbs
+```
+## GKE Specfifc Setup 
+ 
+**Set Environment Variables**
+
+Replace **us-central1** with the region where your GKE cluster resides and **kuberbs-cluster** with your real GKE cluster name
+
+```
+export GCP_REGION=us-central1
+export GKE_CLUSTER_NAME=kuberbs-cluster
+export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
 **Create IAM Service Account and obtain the Key in JSON format**
@@ -169,6 +177,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 --region $GCP_REGION \
 --project $PROJECT_ID
  
+## None GKE Specfifc Setup 
 
 Create a Kubernetes secret by running:
 
