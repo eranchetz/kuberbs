@@ -112,16 +112,19 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
 dep ensure
 ```
 
-Compile the kuberbs by running: 
+You can now compile the kuberbs binary and run tests 
 
 ```
-make builder-image
+make
 ```
 
-Build the Docker image with compiled version of kuberbs as following:
+**Build kuberbs's container image**
+
+Compile the kuberbs binary and build the Docker image as following:
+
 
 ```
-make binary-image
+make image
 ```
 
 Tag the image using: 
